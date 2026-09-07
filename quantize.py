@@ -108,15 +108,15 @@ class ActFakeQuant(nn.Module):
         x_flat = x.detach().float().flatten()
         lo = torch.quantile(x_flat, 0.001)
         hi = torch.quantile(x_flat, 0.999)
-        self.running_min = torch.min(self.running_min, lo)
-        self.running_max = torch.max(self.running_max, hi)
+        self.running_min = torch.min(self.running_min, lo.to(self.running_min.device))
+        self.running_max = torch.max(self.running_max, hi.to(self.running_max.device))
 
     def freeze(self):
         qmin, qmax = 0, 2 ** self.n_bits - 1
         scale = ((self.running_max - self.running_min) / (qmax - qmin)).clamp(min=1e-8)
         zero_point = (qmin - self.running_min / scale).round().clamp(qmin, qmax)
-        self.scale.copy_(scale.reshape(1))
-        self.zero_point.copy_(zero_point.reshape(1))
+        self.scale.copy_(scale.reshape(1).to(self.scale.device))
+        self.zero_point.copy_(zero_point.reshape(1).to(self.zero_point.device))
         self.frozen = True
 
     def forward(self, x):
