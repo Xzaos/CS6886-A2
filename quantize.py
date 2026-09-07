@@ -199,7 +199,7 @@ def freeze_model(model):
             m.freeze()
 
 
-def gptq_quantize(model, loader, device, n_batches=2):
+def gptq_quantize(model, loader, device, n_batches=8):
     model.eval()
     layers = [
         m for m in model.modules()
