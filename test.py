@@ -14,6 +14,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint',  type=str, default='checkpoints/mobilenetv2_cifar10.pth')
     parser.add_argument('--batch_size',  type=int, default=64)
     parser.add_argument('--use_gptq',    action='store_true')
+    parser.add_argument('--qat_checkpoint', type=str, default=None)
     args = parser.parse_args()
 
     torch.manual_seed(42)
@@ -37,30 +38,30 @@ if __name__ == '__main__':
     fp32_acc = evaluate(model, test_loader, device)
     print(f'FP32 accuracy: {fp32_acc:.2f}%')
 
-    swap_layers(model, args.weight_bits, args.act_bits)
-
-    if args.use_gptq:
-        gptq_quantize(model, train_loader, device)
+    if args.qat_checkpoint:
+        swap_layers(model, args.weight_bits, args.act_bits)
+        model.load_state_dict(torch.load(args.qat_checkpoint, weights_only=False, map_location=device))
+        model.to(device)
+        quant_acc = evaluate(model, test_loader, device)
     else:
-        calibrate_model(model, train_loader, device)
-        freeze_model(model)
-
-    quant_acc = evaluate(model, test_loader, device)
+        swap_layers(model, args.weight_bits, args.act_bits)
+        if args.use_gptq:
+            gptq_quantize(model, train_loader, device)
+        else:
+            calibrate_model(model, train_loader, device)
+            freeze_model(model)
+        quant_acc = evaluate(model, test_loader, device)
     print(f'Quantized accuracy: {quant_acc:.2f}%')
-
     sizes = compute_model_size(model, args.weight_bits, args.act_bits)
     for k, v in sizes.items():
         print(f'  {k}: {v:.4f}')
-
     wandb.log({
-        'fp32_acc':   fp32_acc,
-        'quant_acc':  quant_acc,
+        'fp32_acc': fp32_acc,
+        'quant_acc': quant_acc,
         'weight_bits': args.weight_bits,
-        'act_bits':    args.act_bits,
-        'use_gptq':    args.use_gptq,
+        'act_bits': args.act_bits,
+        'use_gptq': args.use_gptq,
         **sizes,
     })
-
     print(f'FP32: {fp32_acc:.2f}% | Quant: {quant_acc:.2f}% | Weight ratio: {sizes["weight_ratio"]:.2f}x | Act ratio: {sizes["act_ratio"]:.2f}x | Size: {sizes["total_mb"]:.2f} MB')
-
     wandb.finish()
