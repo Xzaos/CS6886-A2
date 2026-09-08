@@ -14,7 +14,6 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint',  type=str, default='checkpoints/mobilenetv2_cifar10.pth')
     parser.add_argument('--batch_size',  type=int, default=64)
     parser.add_argument('--use_gptq',    action='store_true')
-    parser.add_argument('--qat_checkpoint', type=str, default=None)
     args = parser.parse_args()
 
     torch.manual_seed(42)
@@ -38,19 +37,13 @@ if __name__ == '__main__':
     fp32_acc = evaluate(model, test_loader, device)
     print(f'FP32 accuracy: {fp32_acc:.2f}%')
 
-    if args.qat_checkpoint:
-        swap_layers(model, args.weight_bits, args.act_bits)
-        model.load_state_dict(torch.load(args.qat_checkpoint, weights_only=False, map_location=device))
-        model.to(device)
-        quant_acc = evaluate(model, test_loader, device)
+    swap_layers(model, args.weight_bits, args.act_bits)
+    if args.use_gptq:
+        gptq_quantize(model, train_loader, device)
     else:
-        swap_layers(model, args.weight_bits, args.act_bits)
-        if args.use_gptq:
-            gptq_quantize(model, train_loader, device)
-        else:
-            calibrate_model(model, train_loader, device)
-            freeze_model(model)
-        quant_acc = evaluate(model, test_loader, device)
+        calibrate_model(model, train_loader, device)
+        freeze_model(model)
+    quant_acc = evaluate(model, test_loader, device)
     print(f'Quantized accuracy: {quant_acc:.2f}%')
     sizes = compute_model_size(model, args.weight_bits, args.act_bits)
     for k, v in sizes.items():

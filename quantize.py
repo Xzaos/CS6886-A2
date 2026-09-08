@@ -2,14 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 def quantize_tensor(x, scale, zero_point, qmin, qmax):
     return (x / scale + zero_point).round().clamp(qmin, qmax)
 
-
 def dequantize_tensor(q, scale, zero_point):
     return (q - zero_point) * scale
-
 
 def get_per_channel_params(weight, n_bits):
     qmax = 2 ** (n_bits - 1) - 1
@@ -17,17 +14,6 @@ def get_per_channel_params(weight, n_bits):
     scale = (max_abs / qmax).clamp(min=1e-8)
     zero_point = torch.zeros_like(scale)
     return scale, zero_point
-
-
-def get_per_tensor_params(x, n_bits, percentile=99.9):
-    qmin, qmax = 0, 2 ** n_bits - 1
-    x_flat = x.detach().float().flatten()
-    x_min = torch.quantile(x_flat, (100.0 - percentile) / 100.0)
-    x_max = torch.quantile(x_flat, percentile / 100.0)
-    scale = ((x_max - x_min) / (qmax - qmin)).clamp(min=1e-8)
-    zero_point = (qmin - x_min / scale).round().clamp(qmin, qmax)
-    return scale, zero_point
-
 
 class QuantConv2d(nn.Conv2d):
     def __init__(self, *args, weight_bits=8, **kwargs):
@@ -61,7 +47,6 @@ class QuantConv2d(nn.Conv2d):
             return F.conv2d(x, w, self.bias, self.stride, self.padding, self.dilation, self.groups)
         return F.conv2d(x, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
 
-
 class QuantLinear(nn.Linear):
     def __init__(self, *args, weight_bits=8, **kwargs):
         super().__init__(*args, **kwargs)
@@ -92,7 +77,6 @@ class QuantLinear(nn.Linear):
                 w = dequantize_tensor(quantize_tensor(self.weight, self.w_scale, self.w_zero_point, qmin, qmax), self.w_scale, self.w_zero_point)
             return F.linear(x, w, self.bias)
         return F.linear(x, self.weight, self.bias)
-
 
 class ActFakeQuant(nn.Module):
     def __init__(self, n_bits=8):
@@ -126,7 +110,6 @@ class ActFakeQuant(nn.Module):
         self.calibrate(x)
         return x
 
-
 def _conv_to_quant(conv, weight_bits):
     q = QuantConv2d(conv.in_channels, conv.out_channels, conv.kernel_size,
                     stride=conv.stride, padding=conv.padding, dilation=conv.dilation,
@@ -137,7 +120,6 @@ def _conv_to_quant(conv, weight_bits):
         q.bias = nn.Parameter(conv.bias.data.clone())
     return q
 
-
 def _linear_to_quant(linear, weight_bits):
     q = QuantLinear(linear.in_features, linear.out_features,
                     bias=linear.bias is not None, weight_bits=weight_bits)
@@ -145,7 +127,6 @@ def _linear_to_quant(linear, weight_bits):
     if linear.bias is not None:
         q.bias = nn.Parameter(linear.bias.data.clone())
     return q
-
 
 def swap_layers(model, weight_bits=8, act_bits=8):
     first_conv_id = id(model.features[0][0])
@@ -183,7 +164,6 @@ def swap_layers(model, weight_bits=8, act_bits=8):
     _swap(model)
     return model
 
-
 def calibrate_model(model, loader, device, n_batches=4):
     model.eval()
     with torch.no_grad():
@@ -192,12 +172,10 @@ def calibrate_model(model, loader, device, n_batches=4):
                 break
             model(inputs.to(device))
 
-
 def freeze_model(model):
     for m in model.modules():
         if isinstance(m, (QuantConv2d, QuantLinear, ActFakeQuant)):
             m.freeze()
-
 
 def gptq_quantize(model, loader, device, n_batches=8):
     model.eval()
@@ -263,7 +241,6 @@ def gptq_quantize(model, loader, device, n_batches=8):
     for m in model.modules():
         if (isinstance(m, QuantConv2d) and m.groups > 1) or isinstance(m, ActFakeQuant):
             m.freeze()
-
 
 def compute_model_size(model, weight_bits, act_bits):
     fp32_mb = sum(p.numel() for p in model.parameters()) * 4 / (1024 ** 2)
