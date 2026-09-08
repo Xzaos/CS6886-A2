@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 def quantize_tensor(x, scale, zero_point, qmin, qmax):
-    return (x / scale + zero_point).round().clamp(qmin, qmax)
+    return (x / scale.to(x.device) + zero_point.to(x.device)).round().clamp(qmin, qmax)
 
 def dequantize_tensor(q, scale, zero_point):
-    return (q - zero_point) * scale
+    return (q - zero_point.to(q.device)) * scale.to(q.device)
 
 def get_per_channel_params(weight, n_bits):
     qmax = 2 ** (n_bits - 1) - 1
