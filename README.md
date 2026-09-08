@@ -4,6 +4,15 @@ Student: Ritwik Mishra | ME23B237
 ## Setup
 pip install torch torchvision wandb
 
+## File Structure
+- train.py — fine-tunes MobileNet-v2 on CIFAR-10
+- test.py — runs PTQ or GPTQ quantization and evaluates
+- sweep.py — runs the full 15-configuration grid sweep
+- quantize.py — quantization implementation (QuantConv2d, QuantLinear, ActFakeQuant, GPTQ)
+- model.py — MobileNet-v2 adapted for CIFAR-10
+- dataloader.py — CIFAR-10 data loading and transforms
+- utils.py — evaluation utilities
+
 ## Reproduce Results
 
 ### Training
@@ -25,10 +34,10 @@ python sweep.py
 
 ## Environment
 - Python 3.11
-- PyTorch 2.x
-- torchvision
-- wandb
-- Random seed: 42 (torch.manual_seed and torch.cuda.manual_seed)
+- torch 2.3.0
+- torchvision 0.18.0
+- wandb 0.28.1
+- Random seed: 42 (torch.manual_seed and torch.cuda.manual_seed set at start of every script)
 
 ## Method
 Post-training quantization with GPTQ-style layer-wise weight optimization.
